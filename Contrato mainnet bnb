@@ -1,0 +1,62 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AggregatorV3Interface.sol";
+
+contract A2Bnb is ERC20, Ownable {
+    uint256 public lastBurnTimestamp;
+    uint256 public constant INITIAL_SUPPLY = 1_000_000_000 * 10 ** 18;
+
+    AggregatorV3Interface internal priceFeedBNB;
+    AggregatorV3Interface internal priceFeedETH;
+
+    constructor() ERC20("A²Bnb", "ABNB") {
+        _mint(msg.sender, INITIAL_SUPPLY);
+        lastBurnTimestamp = block.timestamp;
+
+        // Oráculos Chainlink en BNB Smart Chain Mainnet
+        priceFeedBNB = AggregatorV3Interface(0x0567F2323251f0Aab15c8DfB1967E4e8A7D42aeE);
+        priceFeedETH = AggregatorV3Interface(0x9ef1aE6D479AA6c0D3C65bF8A7dF3C6fE2cE3fA0);
+    }
+
+    // 🔥 Quema automática del 2% anual
+    function autoBurn() external {
+        require(block.timestamp >= lastBurnTimestamp + 365 days, "Aún no ha pasado un año");
+        uint256 burnAmount = (totalSupply() * 2) / 100;
+        _burn(owner(), burnAmount);
+        lastBurnTimestamp = block.timestamp;
+    }
+
+    // 🧾 Solo el propietario puede emitir más tokens
+    function mintMore(uint256 amount) external onlyOwner {
+        _mint(msg.sender, amount * 10 ** 18);
+    }
+
+    // 📈 Simulación de ajuste de precio el día 7
+    function priceAdjustment() public view returns (uint256) {
+        uint256 basePrice = 1 ether;
+        if (isSeventhDay()) {
+            return (basePrice * 130) / 100;
+        }
+        return basePrice;
+    }
+
+    function isSeventhDay() internal view returns (bool) {
+        uint256 day = (block.timestamp / 1 days) % 30;
+        return day == 7;
+    }
+
+    // 📊 Precio BNB/USD desde Chainlink
+    function getBNBPrice() public view returns (int) {
+        (, int price,,,) = priceFeedBNB.latestRoundData();
+        return price;
+    }
+
+    // 📊 Precio ETH/USD desde Chainlink
+    function getETHPrice() public view returns (int) {
+        (, int price,,,) = priceFeedETH.latestRoundData();
+        return price;
+    }
+}
